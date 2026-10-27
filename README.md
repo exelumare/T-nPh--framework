@@ -63,4 +63,6 @@ python main.py
 ​If you find this project useful and would like to support its ongoing development, feel free to contribute:
 ​Saweria: https://saweria.co/Exelumare
 ​Ko-fi / Buy Me a Coffee: https://ko-fi.com/exelumare
-​⚠️ Disclaimer: This tool is created for educational purposes, cybersecurity research, and authorized security testing only. Misuse of this software is solely the user's responsibility.
+​⚠️ Disclaimer: This tool is created for educational purposes, cybersecurity research,
+and authorized security testing only.
+Misuse of this software is solely the user's responsibility.
