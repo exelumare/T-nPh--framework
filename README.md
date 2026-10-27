@@ -50,8 +50,6 @@ pip install requests
 python main.py
 
 ### 3. Windows (CMD / PowerShell)
-'''bash
-
 git clone [https://github.com/exelumare/T-nPh--framework.git]
 cd tanpha-framework
 
