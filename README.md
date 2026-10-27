@@ -22,13 +22,12 @@
 
 ---
 
-## 📥 Installation & Usage
+## 📥 Installation & Multi-Platform Usage
 
-Ensure **Python 3** and the `requests` library are installed on your terminal (Termux / Linux):
-
+### 1. Android (Termux) & Linux (Ubuntu / Debian / Kali)
 ```bash
 # Clone the repository
-git clone [https://github.com/USERNAME/tanpha-framework.git]
+git clone [https://github.com/exelumare/T-nPh--framework.git]
 cd tanpha-framework
 
 # Install dependencies
@@ -37,13 +36,31 @@ pip install requests
 # Run the framework
 python main.py
 
----
+### 2. Arch Linux / Manjaro (Virtual Environment)
+'''bash
+#clone the repository
+git clone [https://github.com/exelumare/T-nPh--framework.git]
+cd tanpha-framework
 
-## ☕ Support & Donation
+# Setup virtual environment
+python -m venv venv
+source venv/bin/activate
 
-If you find this project useful and would like to support its development, feel free to buy me a coffee!
+# Install dependencies & run
+pip install requests
+python main.py
 
-* **Saweria / Trakteer / Ko-fi:** `https://saweria.co/Exelumare'
+### 3. Windows (CMD / PowerShell)
+'''bash
 
-Your support is greatly appreciated to keep this project updated! 🚀
+git clone [https://github.com/exelumare/T-nPh--framework.git]
+cd tanpha-framework
 
+pip install requests
+python main.py
+
+#---☕ Support & Donation
+​If you find this project useful and would like to support its ongoing development, feel free to contribute:
+​Saweria: https://saweria.co/Exelumare
+​Ko-fi / Buy Me a Coffee: https://ko-fi.com/exelumare
+​⚠️ Disclaimer: This tool is created for educational purposes, cybersecurity research, and authorized security testing only. Misuse of this software is solely the user's responsibility.
