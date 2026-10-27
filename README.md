@@ -37,7 +37,6 @@ pip install requests
 python main.py
 
 ### 2. Arch Linux / Manjaro (Virtual Environment)
-'''bash
 #clone the repository
 git clone [https://github.com/exelumare/T-nPh--framework.git]
 cd tanpha-framework
