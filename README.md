@@ -28,7 +28,7 @@
 ```bash
 # Clone the repository
 git clone [https://github.com/exelumare/T-nPh--framework.git]
-cd tanpha-framework
+cd T-nPh--framework
 
 # Install dependencies
 pip install requests
@@ -39,7 +39,7 @@ python main.py
 ### 2. Arch Linux / Manjaro (Virtual Environment)
 #clone the repository
 git clone [https://github.com/exelumare/T-nPh--framework.git]
-cd tanpha-framework
+cd T-nPh--framework
 
 # Setup virtual environment
 python -m venv venv
@@ -51,7 +51,7 @@ python main.py
 
 ### 3. Windows (CMD / PowerShell)
 git clone [https://github.com/exelumare/T-nPh--framework.git]
-cd tanpha-framework
+cd T-nPh--framework
 
 pip install requests
 python main.py
