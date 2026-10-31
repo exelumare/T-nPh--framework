@@ -11,7 +11,7 @@
 
 **TànPhá** is a modular, automated penetration testing framework designed for cybersecurity researchers, bug hunters, and red teamers. Built with a focus on efficiency, it allows you to perform discovery, vulnerability assessment, and post-exploitation directly from your mobile device (Termux) or desktop (Linux).
 
-## 🚀 Features (V3 Architecture)
+## 🚀 What New in Features (V3 Architecture)
 
 *   **Auto Assessment Engine**: A state-machine based engine that automates Discovery, Fingerprinting, Assessment, Validation, and Reporting.
 *   **Multi-Vector Exploitation**:
@@ -23,6 +23,16 @@
 *   **Auto Login Engine**: Automatically detects and bypasses CSRF tokens to scan authenticated pages.
 *   **WAF Evasion**: Request mutation and payload obfuscation techniques.
 *   **Automated Reporting**: Generates clean JSON reports for every scan.
+
+## 🗺️ Roadmap (What's Next in V4)
+
+We are constantly improving TànPhá. Here is a sneak peek at what's coming in the next major update:
+
+*   **Advanced WAF Evasion**: Level 2 (Chunked Encoding, Content-Type Confusion) & Level 3 (Origin IP Discovery) techniques.
+*   **New Exploit Modules**: XSS (Cross-Site Scripting), SSRF (Server-Side Request Forgery), and Subdomain Enumeration.
+*   **Multi-Step/Stateful Scanning**: Support for complex vulnerabilities that require multi-step requests (e.g., DVWA High-level SQLi).
+*   **CLI Arguments (Headless Mode)**: `python main.py -u target.com -m sqli` for CI/CD automation integration.
+*   **HTML/PDF Reporting**: Generate beautiful, client-ready reports directly from the framework.
 
 ## 📥 Installation
 
