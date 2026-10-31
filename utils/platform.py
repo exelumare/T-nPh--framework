@@ -16,8 +16,7 @@ def detect_env() -> str:
 
 
 def clear_screen() -> None:
-    """Clear terminal — cross-platform. Sebelumnya pakai os.system('clear') yang crash di Windows."""
-    if detect_env() == "windows":
+    if sys.platform.startswith("win"):
         os.system("cls")
     else:
         os.system("clear")

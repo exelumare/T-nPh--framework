@@ -1,16 +1,23 @@
-# Python
+# Python Cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
 
-# TànPhá v2
-logs/
+# TànPhá Outputs
 reports/
+logs/
 scope.json
 *.jsonl
+debug.html
 
-# OS
+# Backup & Test Files
+*.bak
+test_engine.py
+get_cookie.py
+logo1.png
+
+# OS Files
 .DS_Store
 Thumbs.db

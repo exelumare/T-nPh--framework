@@ -1,21 +1,8 @@
-"""
-Audit Log — JSONL append-only.
-
-Tujuan:
-  - Mencatat setiap aksi yang dilakukan tool (module_start, module_end, error).
-  - Melindungi USER secara hukum: bukti bahwa pemakaian dilakukan dengan
-    operator yang jelas, waktu yang jelas, target yang jelas.
-  - Tidak mencatat payload atau data sensitif — hanya metadata operasional.
-
-Format: logs/audit_YYYYMMDD.jsonl
-Satu baris = satu event.
-"""
 import json
 import os
 import time
 import uuid
 from datetime import datetime, timezone
-
 
 class AuditLog:
     def __init__(self, operator: str, log_dir: str = "logs"):
@@ -27,13 +14,6 @@ class AuditLog:
         self.log_path = os.path.join(log_dir, f"audit_{date_tag}.jsonl")
 
     def log(self, module: str, action: str, result: str, extra: dict = None) -> None:
-        """
-        Tulis satu event ke audit log.
-        module : 'sqli' | 'upload' | 'cmd_injection' | 'php2shell' | 'system'
-        action : 'module_start' | 'module_end' | 'shutdown' | ...
-        result : 'ok' | 'error' | 'interrupted' | 'running' | ...
-        extra  : dict bebas — JANGAN taruh payload / credential di sini.
-        """
         event = {
             "ts":       datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "epoch":    int(time.time()),
@@ -44,7 +24,6 @@ class AuditLog:
             "result":   result,
         }
         if extra:
-            # Batasi: jangan masukkan password / token / payload mentah
             safe_extra = {}
             for k, v in extra.items():
                 if any(s in k.lower() for s in ("password", "token", "secret", "cookie", "auth")):
@@ -57,7 +36,6 @@ class AuditLog:
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(event, ensure_ascii=False) + "\n")
         except Exception:
-            # Audit log TIDAK boleh membuat tool crash.
             pass
 
     @property
