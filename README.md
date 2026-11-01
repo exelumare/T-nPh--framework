@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/exelumare/T-nPh--framework/master/assets/logo.png" alt="TanPha Logo" width="300">
+  <img src="logo.png" alt="TanPha Logo" width="300">
 </p>
 
 <h1 align="center">TànPhá Framework V4</h1>
