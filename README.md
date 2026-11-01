@@ -26,7 +26,7 @@ V4 is a massive architectural leap from V3, introducing **Multi-Step Sequence En
 
 ---
 
-## 🚀 What's New in V4 (The Birthday Edition)
+## 🚀 What's New in V4 
 V4 is not just an update; it's a total overhaul. Here is what we brought to the table:
 
 1. **Stateful Sequence Engine (`core/sequence.py`)**
@@ -55,7 +55,7 @@ V4 is not just an update; it's a total overhaul. Here is what we brought to the 
 
 ---
 
-## 🗺️ Roadmap (What's Next in V4)
+## 🗺️ Roadmap (What's Next in V5)
 
 We are constantly improving TànPhá. Here is a sneak peek at what's coming in the next major update:
 

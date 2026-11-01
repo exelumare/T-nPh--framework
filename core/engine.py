@@ -6,13 +6,16 @@ from discovery.engine import DiscoveryEngine
 from fingerprint.engine import FingerprintEngine
 from reporting.cli import CLIReporter
 from reporting.json import JSONReporter
+from reporting.html import HTMLReporter
 from core.verification import VerificationStatus
+from core.sequence import SequenceEngine # <--- V4 ADDED
 from urllib.parse import urlparse
 
 class EngineState(Enum):
     START = "START"
     SCOPE_CHECK = "SCOPE_CHECK"
     DISCOVERY = "DISCOVERY"
+    SEQUENCE = "SEQUENCE" # <--- V4 ADDED
     BASELINE = "BASELINE"
     FINGERPRINT = "FINGERPRINT"
     MODULE_SELECTION = "MODULE_SELECTION"
@@ -24,15 +27,17 @@ class EngineState(Enum):
     END = "END"
 
 class AutoAssessmentEngine:
-    def __init__(self, context: TargetContext, modules: list):
+    def __init__(self, context: TargetContext, modules: list, sequence_steps: list = None):
         self.context = context
         self.modules = modules
+        self.sequence_steps = sequence_steps or [] # <--- V4 ADDED
         self.active_modules = []
         self.scope = ScopeManager()
         self.discovery = DiscoveryEngine()
         self.fingerprint = FingerprintEngine()
         self.cli_reporter = CLIReporter()
         self.json_reporter = JSONReporter()
+        self.html_reporter = HTMLReporter()
         self.state = EngineState.START
 
     def run(self):
@@ -68,6 +73,15 @@ class AutoAssessmentEngine:
                     self.discovery.analyze(self.context, scope_checker=self.scope.is_in_scope)
                 except Exception as e:
                     print(f"\n[!] Discovery failed: {e}")
+                self.state = EngineState.SEQUENCE
+
+            # === V4 ADDED: EXECUTE MULTI-STEP SEQUENCE ===
+            elif self.state == EngineState.SEQUENCE:
+                if self.sequence_steps:
+                    seq_engine = SequenceEngine(self.context)
+                    seq_engine.execute(self.sequence_steps)
+                else:
+                    print("Skipped (No sequence provided).")
                 self.state = EngineState.BASELINE
                 
             elif self.state == EngineState.BASELINE:
@@ -175,6 +189,7 @@ class AutoAssessmentEngine:
                 print("\nGenerating Reports...")
                 self.cli_reporter.generate(self.context)
                 self.json_reporter.generate(self.context)
+                self.html_reporter.generate(self.context)
                 self.state = EngineState.END
                 
             else:

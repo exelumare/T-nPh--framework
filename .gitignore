@@ -1,23 +1,17 @@
-# Python Cache
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
+env/
+venv/
 
-# TànPhá Outputs
-reports/
-logs/
-scope.json
-*.jsonl
+# Framework Artifacts
 debug.html
+reports/
 
-# Backup & Test Files
-*.bak
-test_engine.py
-get_cookie.py
-logo1.png
-
-# OS Files
+# OS / Editor
 .DS_Store
-Thumbs.db
+.vscode/
+.idea/

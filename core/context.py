@@ -18,6 +18,9 @@ class TargetInfo:
 class DiscoveryInfo:
     endpoints: List[str] = field(default_factory=list)
     parameters: List[str] = field(default_factory=list)
+    form_action: str = ""      # <--- V4 ADDED
+    form_method: str = "GET"   # <--- V4 ADDED
+    select_options: Dict[str, List[str]] = field(default_factory=dict) # <--- V4 ADDED
 
 @dataclass
 class FingerprintInfo:
@@ -75,3 +78,4 @@ class TargetContext:
     baseline: BaselineInfo = field(default_factory=BaselineInfo)
     results: AssessmentResults = field(default_factory=AssessmentResults)
     http_client: Any = None
+    session_state: Dict[str, Any] = field(default_factory=dict) # <--- V4 ADDED (Memori)

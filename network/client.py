@@ -1,5 +1,6 @@
 import time
 import random
+import json  # <--- V4 ADDED: buat handle json= payload
 import requests
 import traceback
 from urllib.parse import urljoin, urlparse
@@ -11,6 +12,7 @@ from network.result import RequestResult
 from network.mutation import RequestMutator
 from network.exceptions import ScopeViolationError, RedirectLimitExceeded, NonComparableResponseError
 
+
 class HTTPClient:
     def __init__(self, config: HTTPConfig):
         self.config = config
@@ -20,11 +22,10 @@ class HTTPClient:
         
         if self.config.proxy:
             self.session.proxies = {"http": self.config.proxy, "https": self.config.proxy}
-        # Di dalam __init__ HTTPClient:
         self.session.verify = self.config.verify_tls
         self.session.headers.update({
             "User-Agent": self.config.user_agent,
-            "Connection": "close" # <--- FIX: Matikan Keep-Alive biar gak error sama Mock Server
+            "Connection": "close"
         })
 
         if self.config.cookie:
@@ -71,11 +72,40 @@ class HTTPClient:
         else:
             kwargs["headers"] = headers
 
+        # === V4 ADDED: Simpan body asli untuk kebutuhan retry ===
+        # Kita simpan referensi aslinya, karena mutate_body bisa mengubahnya
+        # jadi generator yang habis sekali pakai.
+        original_data = kwargs.get("data")
+        original_json = kwargs.get("json")
+
         if self.config.delay > 0: time.sleep(self.config.delay)
         last_error = None
         
         for attempt in range(1, self.config.max_attempts + 1):
             result.attempts = attempt
+
+            # === V4 ADDED: Body Mutation (Level 2 - AGGRESSIVE) ===
+            # Kita panggil di DALAM loop retry biar generatornya selalu fresh
+            if not bypass_mutation and method.upper() in ("POST", "PUT", "PATCH"):
+                if original_json is not None:
+                    # Konversi json= ke string biar bisa di-chunk
+                    str_data = json.dumps(original_json)
+                    kwargs["headers"], kwargs["data"] = self.mutator.mutate_body(
+                        method, kwargs["headers"], str_data
+                    )
+                    kwargs.pop("json", None)
+                    kwargs["headers"].setdefault("Content-Type", "application/json")
+                elif original_data is not None:
+                    # === V4 FIX: Pastiin Content-Type form terpasang kalau datanya dict ===
+                    if isinstance(original_data, dict):
+                        kwargs["headers"].setdefault("Content-Type", "application/x-www-form-urlencoded")
+                    
+                    # Data form / string / bytes
+                    kwargs["headers"], kwargs["data"] = self.mutator.mutate_body(
+                        method, kwargs["headers"], original_data
+                    )
+            # =======================================================
+
             try:
                 current_url = url
                 max_redirects = 5

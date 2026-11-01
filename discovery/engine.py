@@ -1,4 +1,4 @@
-from urllib.parse import urlparse, parse_qsl
+from urllib.parse import urlparse, parse_qsl, urljoin
 from core.context import TargetContext
 from typing import Callable, Optional
 import re
@@ -16,33 +16,45 @@ class DiscoveryEngine:
             print(f"   [+] Discovered {len(context.discovery.parameters)} GET parameters: {context.discovery.parameters}")
             return
         
-        # 2. Kalau nggak ada, parse form HTML (buat POST)
+        # 2. Kalau nggak ada, parse form HTML (buat POST / Multi-Step)
         print("   [*] No GET parameters. Attempting Form Discovery...")
         try:
             res = context.http_client.request("GET", target_url, scope_checker=scope_checker)
             if res.success and res.response:
-                print(f"   [DEBUG] HTTP Status: {res.response.status_code}")
-                print(f"   [DEBUG] Response Length: {len(res.response.text)} chars")
+                html = res.response.text
                 
-                # Simpan HTML-nya ke file biar bisa lu baca
                 with open("debug.html", "w") as f:
-                    f.write(res.response.text)
-                print("   [DEBUG] Saved HTML to: debug.html")
+                    f.write(html)
                 
-                # Cek manual string-nya ada atau nggak
-                if 'name="id"' in res.response.text:
-                    print('   [DEBUG] String name="id" FOUND')
-                elif "name='id'" in res.response.text:
-                    print("   [DEBUG] String name='id' FOUND")
-                else:
-                    print('   [DEBUG] String "id" NOT FOUND in HTML')
+                # === V4.1 SUPER LONGGAR REGEX ===
+                # Ambil SEMUA tag <input>, <select>, <textarea> yang punya atribut 'name'
+                inputs = re.findall(r'<(?:input|select|textarea)[^>]*name=["\']?([^"\'\s>]+)["\']?', html, re.IGNORECASE)
+                
+                # Ambil Form Action & Method
+                form_match = re.search(r'<form[^>]*>', html, re.IGNORECASE)
+                if form_match:
+                    form_tag = form_match.group(0)
+                    action_match = re.search(r'action=["\']?([^"\'\s>]*)["\']?', form_tag, re.IGNORECASE)
+                    method_match = re.search(r'method=["\']?([^"\'\s>]+)["\']?', form_tag, re.IGNORECASE)
                     
-                # Regex yang lebih longgar
-                inputs = re.findall(r'name\s*=\s*["\']?([^"\'\s>]+)["\']?', res.response.text, re.IGNORECASE | re.DOTALL)
-                print(f"   [DEBUG] Raw matches: {inputs}")
+                    action = action_match.group(1) if action_match else ""
+                    method = method_match.group(1).upper() if method_match else "POST"
+                    
+                    context.discovery.form_action = urljoin(target_url, action) if action else target_url
+                    context.discovery.form_method = method
+                    print(f"   [DEBUG] Form Action: {context.discovery.form_action} | Method: {method}")
+                else:
+                    context.discovery.form_action = target_url
+                    context.discovery.form_method = "POST"
+
+                # Filter parameter sampah
+                params_found = []
+                for p in dict.fromkeys(inputs):
+                    if not any(x in p.lower() for x in ["token", "submit", "btn", "button"]):
+                        params_found.append(p)
                 
-                params_found = [p for p in dict.fromkeys(inputs) if "token" not in p.lower() and "submit" not in p.lower()]
                 context.discovery.parameters = params_found
-                print(f"   [+] Discovered {len(params_found)} form fields: {params_found}")
+                print(f"   [+] Discovered parameters: {params_found}")
+                    
         except Exception as e:
             print(f"   [-] Form Discovery failed: {e}")
