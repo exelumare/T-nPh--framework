@@ -1,185 +1,89 @@
 <p align="center">
-  <img src="logo.png" alt="TanPha Logo" width="300">
+  <img src="logo.png" alt="TànPhá Logo" width="200"/>
 </p>
 
-<h1 align="center">TànPhá Framework V4</h1>
-<h3 align="center">The Global Foundation Edition</h3>
+<h1 align="center">TànPhá V5 (Beta)</h1>
 
 <p align="center">
-  <a href="https://saweria.co/Exelumare"><img src="https://img.shields.io/badge/Saweria-Donate-orange?style=for-the-badge&logo=buymeacoffee" alt="Saweria"></a>
-  <a href="https://ko-fi.com/exelumare"><img src="https://img.shields.io/badge/Ko--fi-Support-blue?style=for-the-badge&logo=ko-fi" alt="Ko-fi"></a>
+  <i>An AI-Assisted Open-Source DAST Framework. Built from scratch on an Android Phone.</i>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-4.0.0-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/Python-3.8%2B-green.svg" alt="Python">
-  <img src="https://img.shields.io/badge/Platform-Termux%20%7C%20Linux-orange.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-Global%20Ready-red.svg" alt="Status">
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#support">Support</a>
 </p>
 
 ---
 
-## 📖 Overview
-**TànPhá** is a modular, enterprise-grade Command-Line Interface (CLI) Penetration Testing Framework. Designed for beginner bug hunters with limited devices (Android/Termux) but capable of scanning global web applications. 
+## 📖 About TànPhá
 
-V4 is a massive architectural leap from V3, introducing **Multi-Step Sequence Engines**, **Headless CLI Mode**, and **Advanced WAF Evasion**.
+**TànPhá** (Vietnamese for *Destruction*) is a custom, lightweight Dynamic Application Security Testing (DAST) framework. It is designed to be fast, highly accurate, and accessible to everyone—from bug bounty hunters to security researchers.
 
----
+Unlike enterprise tools that charge thousands of dollars, TànPhá is 100% free and open-source. 
 
-## 🚀 What's New in V4 
-V4 is not just an update; it's a total overhaul. Here is what we brought to the table:
+> **Current Status:** Beta. 
+> Our primary focus is on **Zero False Positives**. We believe a scanner should never waste a researcher's time with hallucinated alerts. 
 
-1. **Stateful Sequence Engine (`core/sequence.py`)**
-   - Say goodbye to hardcoded logic. V4 can process JSON macros (`--macro`) to handle complex, multi-step web apps (e.g., bypassing CSRF, establishing sessions, then injecting payloads).
+### 🏆 Benchmark Results
+In our testing against the **OWASP Benchmark** (Command Injection Category), TànPhá V5 achieved:
+*   **Detection Rate (TPR):** 90%+
+*   **False Positive Rate (FPR):** **0.0%**
+*   *Note: We are continuously working to eliminate remaining False Negatives.*
 
-2. **True Headless Mode**
-   - Run fully automated scans without interactive prompts.
-   - Example: `python main.py -u http://target.com -m xss -e 3`
+## ✨ Key Features
 
-3. **WAF Evasion Level 2 (`network/mutation.py`)**
-   - Implemented **Chunked Transfer Encoding** and **Content-Type Confusion** to bypass modern Web Application Firewalls (WAF).
+*   **🧠 AI Hydra (Multi-Provider):** Uses a 4-tier AI fallback (OpenRouter, SambaNova, Mistral, Gemini) to verify vulnerabilities and eliminate false positives.
+*   **🛡️ WAF Evasion:** Built-in `curl_cffi` integration to impersonate real Chrome browsers, bypassing Cloudflare/DataDome.
+*   **🎯 Multi-Vector Injection:** Tests not just GET/POST parameters, but also HTTP Headers, Cookies, and Environment Variables.
+*   **🖥️ Custom OS-Style UI:** A fully interactive, terminal-based OS-style interface (Neofetch style) with glitch boot sequences.
+*   **📄 Automated Reporting:** Automatically generates professional JSON, HTML, and PDF reports.
 
-4. **New Global Modules:**
-   - **XSS Module:** Detects Reflected & Stored XSS with context-aware payloads (Tested on Google XSS Game).
-   - **SSRF Module:** Smart Request engine (GET/POST) with Time-Based (Blind) SSRF detection and Universal Indicators.
-   - **Subdomain Enumeration:** Automated recon using `crt.sh` API to find hidden subdomains.
+## 🛠️ Installation
 
-5. **Upgraded Legacy Modules (V3 -> V4):**
-   - **LFI:** Added `file://` Stream Wrapper bypass to defeat `fnmatch` restrictions (DVWA High). Includes Auto Base64 Decoder for `php://filter`.
-   - **CMD Injection:** Fixed Pseudo-Shell output using Newline (`\n`) separators for synchronous execution.
-   - **SQLi:** Upgraded to a Hybrid Engine (String & Numeric). Handles CSRF tokens and detects HTTP status code changes.
-   - **File Upload & PHP2Shell:** Preserved and stabilized.
-
-6. **HTML Reporting (`reporting/html.py`)**
-   - Generates a beautiful, responsive Dark-Mode HTML report automatically. No more reading raw JSON.
-
----
-
-## 🗺️ Roadmap (What's Next in V5)
-
-We are constantly improving TànPhá. Here is a sneak peek at what's coming in the next major update:
-
-*   **Advanced WAF Evasion**: Level 2 (Chunked Encoding, Content-Type Confusion) & Level 3 (Origin IP Discovery) techniques.
-*   **New Exploit Modules**: XSS (Cross-Site Scripting), SSRF (Server-Side Request Forgery), and Subdomain Enumeration.
-*   **Multi-Step/Stateful Scanning**: Support for complex vulnerabilities that require multi-step requests (e.g., DVWA High-level SQLi).
-*   **CLI Arguments (Headless Mode)**: `python main.py -u target.com -m sqli` for CI/CD automation integration.
-*   **HTML/PDF Reporting**: Generate beautiful, client-ready reports directly from the framework.
-
-## 📥 Installation
+TànPhá is designed to run on Termux (Android) or any Linux environment.
 
 ```bash
-# 1. Update system and install dependencies
-pkg update && pkg upgrade -y
-pkg install python git -y
-
-# 2. Clone the repository
+# 1. Clone the repository
 git clone https://github.com/exelumare/T-nPh--framework.git
 cd T-nPh--framework
 
-# 3. Install Python requirements
+# 2. Install dependencies
+pkg install python clang make openssl libffi libxml2 libxslt pkg-config -y
 pip install -r requirements.txt
 
-# 4. Run the framework
-python main.py
+# 3. Setup Environment Variables
+cp .env.example .env
+nano .env # Add your API keys here
+```
 
----
+🚀 Usage
 
-💻 Usage
-
-1. Interactive Mode (Beginner Friendly)
-
-Simply run the tool and follow the on-screen menus.
+Run TànPhá in interactive menu mode:
 
 ```bash
 python main.py
 ```
 
-2. Headless Mode (Automation & Scripting)
-
-Run scans directly from your terminal without prompts.
+Run in headless mode (direct scan):
 
 ```bash
-python main.py -u <TARGET_URL> -m <MODULE> -e <EVASION_LEVEL>
+python main.py -u "https://target.com" -m full --delay 1.5
 ```
 
-Arguments:
+☕ Support the Project
 
-· -u, --url: Target URL.
-· -m, --module: full, sqli, cmd, upload, lfi, xss, ssrf, subdomain, php2shell.
-· -e, --evasion: 1 (None), 2 (Standard), 3 (Aggressive/Chunked).
-· -c, --cookie: Manual authentication via Cookie string.
-· --login-url, --user, --passwd: Auto-login credentials.
-· --macro: Path to a JSON file for Multi-Step sequences.
+TànPhá is built by a solo developer in his free time. It is completely free and will always be free.
 
-Examples:
+However, if this tool helps you find a bug and earn a bounty, consider supporting the development! Your donations go directly to keeping the AI servers alive and buying coffee for late-night coding sessions.
 
-```bash
-# Scan XSS on a global target
-python main.py -u "https://xss-game.appspot.com/level1/frame?query=test" -m xss -e 1
-
-# Scan SQLi with Auto-Login on DVWA High
-python main.py -u "http://127.0.0.1:8080/vulnerabilities/sqli/" -m sqli -e 3 --login-url "http://127.0.0.1:8080/login.php" --user admin --passwd password --sec-level high
-```
-
-3. Multi-Step Macro (Advanced)
-
-For complex web apps (like DVWA High SQLi), use a Macro JSON file.
-
-```bash
-python main.py -u "http://target.com/vuln.php" -m sqli --macro dvwa_sqli_high.json
-```
-
----
-
-🧩 Available Modules
-
-Module Description Global Ready
-XSS Reflected, Stored, DOM-context breakout ✅
-SQLi Error, Boolean, Time-Based (Hybrid) ✅
-SSRF Internal fetch, Cloud Metadata, Blind ✅
-LFI Path Traversal, Stream Wrapper, Log Poisoning ✅
-CMD Direct, Time-Based, Interactive Shell ✅
-Subdomain crt.sh Reconnaissance ✅
-
----
-
-## 🔮 Roadmap to V5 (The Birthday Edition)
-V4 is just the foundation. Here is the blueprint for the upcoming V5 (Target: November 20th):
-- [ ] **Out-of-Band (OOB) Engine:** Interactsh integration for Blind SSRF/SQLi.
-- [ ] **API & JSON Fuzzing:** Support for REST APIs and JWT injection.
-- [ ] **WAF Evasion L3:** Origin IP Discovery (Bypassing Cloudflare).
-- [ ] **DOM XSS Scanner:** Headless browser integration.
-- [ ] **SQLi Heuristic & ML:** Reducing False Negatives with lightweight Machine Learning.
-- [ ] **LFI/RCE Expansion:** Log Poisoning & advanced wrappers.
-- [ ] **LFI Wordlist Fuzzing:** Automated `.env` and config file hunting.
-- [ ] **PDF Reporting:** Professional client-ready reports.
-- [ ] **Full High-Level Bypasses:** Advanced payloads for all modules.
-
----
-
----
-
-## ☕ Support the Developer
-If TànPhá helps you find bugs, secure your applications, or land a bug bounty, consider buying me a coffee! Your support keeps this project alive and fuels the development of V5.
-
-<div align="center">
-  <a href="https://saweria.co/Exelumare" target="_blank">
-    <img src="https://img.shields.io/badge/Saweria-Indonesia-orange?style=for-the-badge" alt="Saweria">
-  </a>
-  <a href="https://ko-fi.com/exelumare" target="_blank">
-    <img src="https://img.shields.io/badge/Ko--fi-Global-blue?style=for-the-badge&logo=ko-fi" alt="Ko-fi">
-  </a>
-</div>
-
----
+· Ko-fi (International): https://ko-fi.com/exelumare
 
 ⚠️ Disclaimer
 
-TànPhá is intended for educational purposes and authorized penetration testing only. Do not use this tool on websites you do not own or have permission to test. The developer is not responsible for any illegal activities or damage caused by this tool.
+This tool is intended for educational purposes and authorized security testing only. Do not use TànPhá against systems you do not own or have explicit permission to test. The developer is not responsible for any misuse or damage caused by this tool.
 
 ---
 
-<p align="center">Made with ❤️ and ☕ on Termux</p>
-```
-
----
+Built with chaos, coffee, and pure Python. - Exelumare
