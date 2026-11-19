@@ -1,0 +1,6 @@
+from enum import Enum
+
+class VerificationStatus(Enum):
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
+    INCONCLUSIVE = "INCONCLUSIVE"

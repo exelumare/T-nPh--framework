@@ -1,0 +1,13 @@
+{
+  "steps": [
+    {
+      "name": "Submit Initial ID (Establish Session)",
+      "method": "POST",
+      "url": "http://127.0.0.1:8080/vulnerabilities/sqli/",
+      "data": {
+        "id": "1",
+        "Submit": "Submit"
+      }
+    }
+  ]
+}
