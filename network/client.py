@@ -12,12 +12,11 @@ from datetime import datetime, timezone
 from typing import Dict, Optional, Callable, Any, Tuple
 import urllib3
 
-# --- THE GAME CHANGER: CURL_CFFI ---
 from curl_cffi import requests
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from network.config import HTTPConfig, EvasionLevel
-from network.result import RequestResult
+from network.result import RequestResult, NormalizedResponse
 from network.mutation import RequestMutator
 from network.exceptions import ScopeViolationError, RedirectLimitExceeded, NonComparableResponseError
 from core.scope import parse_origin
@@ -33,8 +32,6 @@ class HTTPClient:
     def __init__(self, config: HTTPConfig, lab_checker=None):
         self.config = config
         self._lab_checker = lab_checker
-        
-        # Menggunakan impersonate Chrome biar lolos WAF
         self.session = requests.Session(impersonate="chrome")
         self._verify_tls = self.config.verify_tls
         self._rng = random.Random(self.config.random_seed)
@@ -102,17 +99,29 @@ class HTTPClient:
             return False, "DNS_RESOLUTION_FAILED"
 
     def resolve_dns(self, hostname: str, parent_url: str, auth_checker: Callable[[str], bool] = None) -> list:
-        if not auth_checker: return []
+        if not auth_checker:
+            return []
+
         parent = parse_origin(parent_url)
-        if not parent: return []
+        if not parent:
+            return []
+
         scheme, _, port = parent
         test_url = f"{scheme}://{hostname}:{port}"
+
         try:
-            if not auth_checker(test_url): return []
-        except Exception: return []
+            if not auth_checker(test_url):
+                return []
+        except Exception:
+            return []
+
         try:
-            return [res[4][0] for res in socket.getaddrinfo(hostname, None)]
-        except Exception: return []
+            return [
+                res[4][0]
+                for res in socket.getaddrinfo(hostname, None)
+            ]
+        except Exception:
+            return []
 
     def request(self, method: str, url: str, target_param: str = None, auth_checker: Optional[Callable[[str], bool]] = None, **kwargs) -> RequestResult:
         result = RequestResult()
@@ -121,10 +130,13 @@ class HTTPClient:
         if not auth_checker:
             result.error = ScopeViolationError("Missing auth_checker. Fail-closed.")
             result.retry_reason = "MISSING_AUTH_CHECKER"
+            result.elapsed = time.perf_counter() - start_time
             return result
+
         if not parse_origin(url):
             result.error = ScopeViolationError(f"Invalid URL format: {url}")
             result.retry_reason = "INVALID_URL"
+            result.elapsed = time.perf_counter() - start_time
             return result
 
         effective_evasion = self.config.evasion_level
@@ -177,12 +189,14 @@ class HTTPClient:
                 if not parse_origin(current_url):
                     result.error = ScopeViolationError(f"Invalid URL after mutation: {current_url}")
                     result.retry_reason = "INVALID_URL"
+                    result.elapsed = time.perf_counter() - start_time
                     return result
 
                 is_dns_safe, dns_reason = self._check_dns_rebinding(current_url, auth_checker)
                 if not is_dns_safe:
                     result.error = ScopeViolationError(f"DNS check failed: {dns_reason}")
                     result.retry_reason = dns_reason
+                    result.elapsed = time.perf_counter() - start_time
                     return result
 
                 try:
@@ -190,11 +204,13 @@ class HTTPClient:
                 except Exception as e:
                     result.error = ScopeViolationError(f"Auth checker exception: {e}")
                     result.retry_reason = "AUTH_CHECKER_ERROR"
+                    result.elapsed = time.perf_counter() - start_time
                     return result
                 
                 if not is_allowed:
                     result.error = ScopeViolationError(f"Initial URL out of scope: {current_url}")
                     result.retry_reason = "SCOPE_VIOLATION"
+                    result.elapsed = time.perf_counter() - start_time
                     return result
 
                 try:
@@ -232,7 +248,6 @@ class HTTPClient:
                         except Exception:
                             pass
 
-                        # --- FIX: Konstruksi request yang aman buat curl_cffi ---
                         req_kwargs = {
                             "method": cur_method,
                             "url": current_url,
@@ -242,9 +257,7 @@ class HTTPClient:
                             "verify": _req_verify
                         }
                         
-                        # Jangan kirim data/json kalau emang kosong (None)
                         if cur_data is not None:
-                            # Antisipasi kalau mutate_body ngembaliin generator
                             if hasattr(cur_data, '__iter__') and not isinstance(cur_data, (dict, list, tuple, str, bytes)):
                                 cur_data = b"".join(cur_data)
                             req_kwargs["data"] = cur_data
@@ -266,12 +279,22 @@ class HTTPClient:
                             if not loc:
                                 response.close()
                                 raise ScopeViolationError(f"Redirect missing Location")
-                            next_url = urljoin(current_url, loc)
+                            try:
+                                next_url = urljoin(current_url, loc)
+                            except ValueError as e:
+                                response.close()
+                                result.error = ScopeViolationError(
+                                    f"Invalid redirect URL: {e}"
+                                )
+                                result.retry_reason = "INVALID_URL"
+                                result.elapsed = time.perf_counter() - start_time
+                                return result
                             
                             if not parse_origin(next_url):
                                 response.close()
                                 result.error = ScopeViolationError(f"Invalid redirect: {next_url}")
                                 result.retry_reason = "INVALID_URL"
+                                result.elapsed = time.perf_counter() - start_time
                                 return result
 
                             is_dns_safe, dns_reason = self._check_dns_rebinding(next_url, auth_checker)
@@ -279,6 +302,7 @@ class HTTPClient:
                                 response.close()
                                 result.error = ScopeViolationError(f"DNS failed on redirect: {dns_reason}")
                                 result.retry_reason = dns_reason
+                                result.elapsed = time.perf_counter() - start_time
                                 return result
 
                             try:
@@ -287,6 +311,7 @@ class HTTPClient:
                                 response.close()
                                 result.error = ScopeViolationError(f"Redirect auth exception: {e}")
                                 result.retry_reason = "AUTH_CHECKER_ERROR"
+                                result.elapsed = time.perf_counter() - start_time
                                 return result
                                 
                             if not is_allowed_redirect:
@@ -304,6 +329,7 @@ class HTTPClient:
                                     response.close()
                                     result.error = ScopeViolationError("Cross-origin blocked (cert set).")
                                     result.retry_reason = "SCOPE_VIOLATION"
+                                    result.elapsed = time.perf_counter() - start_time
                                     return result
 
                             def remove_header_ci(headers_dict, header_name):
@@ -345,23 +371,45 @@ class HTTPClient:
                             continue
                         break
 
+
                     if response.status_code == 429:
                         wait = self._parse_retry_after(response.headers)
                         result.retry_reason = "http_429"
+
+                        if attempt >= self.config.max_attempts:
+                            result.response = NormalizedResponse(response)
+                            response.close()
+                            result.elapsed = time.perf_counter() - start_time
+                            return result
+
                         response.close()
                         time.sleep(wait)
                         continue
+
                     if response.status_code in (502, 503, 504):
                         result.retry_reason = f"http_{response.status_code}"
+
+                        if attempt >= self.config.max_attempts:
+                            result.response = NormalizedResponse(response)
+                            response.close()
+                            result.elapsed = time.perf_counter() - start_time
+                            return result
+
                         response.close()
-                        time.sleep((2 ** attempt) + self._rng.uniform(0, 1))
+                        time.sleep(
+                            (2 ** attempt) + self._rng.uniform(0, 1)
+                        )
                         continue
+
                     if response.status_code == 500:
-                        result.response = response
+                        result.response = NormalizedResponse(response)
+                        response.close()
                         result.elapsed = time.perf_counter() - start_time
                         result.retry_reason = "http_500"
                         return result
-                    result.response = response
+
+                    result.response = NormalizedResponse(response)
+                    response.close()
                     result.elapsed = time.perf_counter() - start_time
                     result.retry_reason = None
                     return result

@@ -7,22 +7,38 @@ from network.client import HTTPClient
 from core.context import TargetContext
 from core.engine import AutoAssessmentEngine
 from modules.sqli import SQLInjectionModule
+from core.scope import ScopeManager
 
 # Mock isatty biar engine nggak nunggu input() di state EXPLOIT
 @patch('sys.stdin')
 def test_dedupe_single_param(mock_stdin, mock_server):
     """Test #13: 1 param vuln -> 1 finding, bukan 3."""
-    mock_stdin.isatty.return_value = False # Biar auto-skip exploit
-    
-    config = HTTPConfig(random_seed=42, evasion_level=EvasionLevel.STANDARD, delay=0)
+    mock_stdin.isatty.return_value = False
+
+    config = HTTPConfig(
+        random_seed=42,
+        evasion_level=EvasionLevel.STANDARD,
+        delay=0,
+    )
     client = HTTPClient(config)
+
     ctx = TargetContext()
     ctx.target.base_url = f"{mock_server}/sqli-error?q=1"
     ctx.http_client = client
-    
-    engine = AutoAssessmentEngine(ctx, [SQLInjectionModule()])
+
+    scope = ScopeManager()
+    scope.approve_session(
+        ctx.target.base_url,
+        duration_minutes=5,
+    )
+
+    engine = AutoAssessmentEngine(
+        ctx,
+        [SQLInjectionModule()],
+        scope_manager=scope,
+    )
     engine.run()
-    
+
     assert len(ctx.results.validated) == 1, f"Expected 1 finding, got {len(ctx.results.validated)}"
     assert ctx.results.validated[0].parameter == "q"
     client.close()
@@ -38,8 +54,17 @@ def test_footer_mysql_not_flagged(mock_stdin, mock_server):
     ctx.target.base_url = f"{mock_server}/footer-mysql?q=1"
     ctx.http_client = client
     
-    engine = AutoAssessmentEngine(ctx, [SQLInjectionModule()])
-    engine.run()
+    scope = ScopeManager()
+    scope.approve_session(
+        ctx.target.base_url,
+        duration_minutes=5,
+    )
+
+    engine = AutoAssessmentEngine(
+        ctx,
+        [SQLInjectionModule()],
+        scope_manager=scope,
+    )
     
     assert len(ctx.results.validated) == 0, f"Expected 0 finding, got {len(ctx.results.validated)}"
     client.close()
